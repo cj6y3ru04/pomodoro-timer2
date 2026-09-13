@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#EF4444">
+    <title>🍅 蕃茄鐘</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Tone.js 音效 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            transition:
+                background-color 0.5s ease,
+                color 0.3s ease;
+        }
+
+        button {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .progress-ring {
+            transition:
+                stroke-dashoffset 0.5s linear,
+                stroke 0.3s ease;
+            transform: rotate(-90deg);
+            transform-origin: center;
+        }
+
+        .timer-container {
+            transition:
+                box-shadow 0.5s ease,
+                transform 0.2s ease;
+        }
+
+        .timer-container.running {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.015);
+            }
+        }
+
+        .modal-bg {
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        input[type="number"] {
+            appearance: textfield;
+            -moz-appearance: textfield;
+        }
+
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            appearance: none;
+            margin: 0;
+        }
+
+        .safe-bottom {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen text-white">
+
+<div id="app"
+     class="min-h-screen w-full flex flex-col items-center px-4 py-6 md:py-10">
+
+    <!-- ============================= -->
+    <!-- 頂部 -->
+    <!-- ============================= -->
+
+    <header class="w-full max-w-lg flex items-center justify-between mb-7">
+
+        <div>
+            <h1 class="text-3xl md:text-4xl font-black">
+                🍅 蕃茄鐘
+            </h1>
+
+            <p class="text-white/70 text-sm mt-1">
+                專注現在，完成每一件事
+            </p>
+        </div>
+
+        <button
+            id="settings-btn"
+            aria-label="設定"
+            class="w-12 h-12 rounded-full bg-black/20 hover:bg-black/30
+                   flex items-center justify-center text-xl
+                   transition active:scale-90">
+            ⚙️
+        </button>
+
+    </header>
+
+
+    <!-- ============================= -->
+    <!-- 模式 -->
+    <!-- ============================= -->
+
+    <div class="w-full max-w-lg bg-black/20 p-2 rounded-2xl shadow-xl">
+
+        <div class="grid grid-cols-3 gap-2">
+
+            <button
+                data-mode="POMODORO"
+                class="mode-btn py-3 px-2 rounded-xl font-bold text-sm
+                       transition active:scale-95">
+                🍅 工作
+            </button>
+
+            <button
+                data-mode="SHORT_BREAK"
+                class="mode-btn py-3 px-2 rounded-xl font-bold text-sm
+                       transition active:scale-95">
+                ☕ 短休息
+            </button>
+
+            <button
+                data-mode="LONG_BREAK"
+                class="mode-btn py-3 px-2 rounded-xl font-bold text-sm
+                       transition active:scale-95">
+                🌙 長休息
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- ============================= -->
+    <!-- 計時器 -->
+    <!-- ============================= -->
+
+    <main class="flex flex-col items-center mt-8">
+
+        <div
+            id="timer-container"
+            class="timer-container relative
+                   w-72 h-72
+                   sm:w-80 sm:h-80
+                   md:w-96 md:h-96
+                   rounded-full
+                   bg-black/20
+                   flex items-center justify-center
+                   shadow-2xl">
+
+            <svg
+                class="absolute w-full h-full"
+                viewBox="0 0 240 240">
+
+                <!-- 背景圓 -->
+                <circle
+                    stroke="rgba(255,255,255,0.18)"
+                    stroke-width="9"
+                    fill="transparent"
+                    r="108"
+                    cx="120"
+                    cy="120"
+                />
+
+                <!-- 進度圓 -->
+                <circle
+                    id="progress-circle"
+                    class="progress-ring"
+                    stroke="#FFFFFF"
+                    stroke-width="9"
+                    fill="transparent"
+                    stroke-linecap="round"
+                    r="108"
+                    cx="120"
+                    cy="120"
+                />
+
+            </svg>
+
+
+            <!-- 中間內容 -->
+
+            <div class="relative z-10 text-center">
+
+                <div
+                    id="time-display"
+                    class="text-6xl sm:text-7xl md:text-8xl
+                           font-black tabular-nums tracking-tight">
+                    25:00
+                </div>
+
+                <div
+                    id="status-text"
+                    class="text-lg md:text-xl
+                           font-bold mt-2 text-white/80">
+                    準備開始
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- ============================= -->
+        <!-- 控制按鈕 -->
+        <!-- ============================= -->
+
+        <div class="flex items-center gap-4 mt-8">
+
+            <button
+                id="start-pause-btn"
+                class="bg-white text-gray-900
+                       min-w-[140px]
+                       px-8 py-4
+                       rounded-full
+                       text-xl font-black
+                       shadow-xl
+                       transition
+                       hover:scale-105
+                       active:scale-95">
+                開始
+            </button>
+
+            <button
+                id="reset-btn"
+                class="bg-black/25 text-white
+                       px-7 py-4
+                       rounded-full
+                       text-xl font-bold
+                       shadow-lg
+                       transition
+                       hover:bg-black/35
+                       active:scale-95">
+                ↻
+            </button>
+
+        </div>
+
+    </main>
+
+
+    <!-- ============================= -->
+    <!-- 統計 -->
+    <!-- ============================= -->
+
+    <section class="w-full max-w-lg mt-9">
+
+        <div class="grid grid-cols-2 gap-3">
+
+            <div class="bg-black/20 rounded-2xl p-4 text-center">
+
+                <div class="text-2xl">
+                    🍅
+                </div>
+
+                <div
+                    id="today-count"
+                    class="text-2xl font-black mt-1">
+                    0
+                </div>
+
+                <div class="text-sm text-white/70">
+                    今日完成
+                </div>
+
+            </div>
+
+
+            <div class="bg-black/20 rounded-2xl p-4 text-center">
+
+                <div class="text-2xl">
+                    🔥
+                </div>
+
+                <div
+                    id="streak-count"
+                    class="text-2xl font-black mt-1">
+                    0
+                </div>
+
+                <div class="text-sm text-white/70">
+                    連續天數
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="text-center mt-4">
+
+            <button
+                id="clear-count-btn"
+                class="text-sm text-white/60 underline
+                       hover:text-white transition">
+                清除今日紀錄
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- ============================= -->
+    <!-- 通知 -->
+    <!-- ============================= -->
+
+    <div
+        id="notification-box"
+        class="fixed left-4 right-4 bottom-5
+               md:left-1/2 md:right-auto
+               md:-translate-x-1/2
+               md:min-w-[340px]
+               px-6 py-4
+               rounded-2xl
+               bg-white text-gray-900
+               text-center font-bold
+               shadow-2xl
+               opacity-0
+               translate-y-5
+               pointer-events-none
+               transition-all duration-300
+               z-50">
+    </div>
+
+
+    <!-- ============================= -->
+    <!-- 設定視窗 -->
+    <!-- ============================= -->
+
+    <div
+        id="settings-modal"
+        class="fixed inset-0
+               bg-black/50 modal-bg
+               flex items-center justify-center
+               p-4
+               opacity-0 pointer-events-none
+               transition-opacity duration-300
+               z-40">
+
+        <div
+            class="w-full max-w-md
+                   bg-gray-900
+                   rounded-3xl
+                   p-6
+                   shadow-2xl
+                   transform scale-95
+                   transition-transform duration-300"
+            id="settings-panel">
+
+            <div class="flex items-center justify-between mb-6">
+
+                <h2 class="text-2xl font-black">
+                    ⚙️ 設定
+                </h2>
+
+                <button
+                    id="close-settings-btn"
+                    class="text-2xl text-gray-400
+                           hover:text-white">
+                    ✕
+                </button>
+
+            </div>
+
+
+            <!-- 工作時間 -->
+
+            <label class="block mb-5">
+
+                <div class="flex justify-between mb-2">
+
+                    <span class="font-bold">
+                        🍅 工作時間
+                    </span>
+
+                    <span class="text-gray-400">
+                        分鐘
+                    </span>
+
+                </div>
+
+                <input
+                    id="work-input"
+                    type="number"
+                    min="1"
+                    max="120"
+                    class="w-full bg-gray-800
+                           border border-gray-700
+                           rounded-xl
+                           px-4 py-3
+                           text-white
+                           text-lg
+                           outline-none
+                           focus:border-red-500"
+                >
+
+            </label>
+
+
+            <!-- 短休息 -->
+
+            <label class="block mb-5">
+
+                <div class="flex justify-between mb-2">
+
+                    <span class="font-bold">
+                        ☕ 短休息
+                    </span>
+
+                    <span class="text-gray-400">
+                        分鐘
+                    </span>
+
+                </div>
+
+                <input
+                    id="short-input"
+                    type="number"
+                    min="1"
+                    max="60"
+                    class="w-full bg-gray-800
+                           border border-gray-700
+                           rounded-xl
+                           px-4 py-3
+                           text-white
+                           text-lg
+                           outline-none
+                           focus:border-green-500"
+                >
+
+            </label>
+
+
+            <!-- 長休息 -->
+
+            <label class="block mb-5">
+
+                <div class="flex justify-between mb-2">
+
+                    <span class="font-bold">
+                        🌙 長休息
+                    </span>
+
+                    <span class="text-gray-400">
+                        分鐘
+                    </span>
+
+                </div>
+
+                <input
+                    id="long-input"
+                    type="number"
+                    min="1"
+                    max="120"
+                    class="w-full bg-gray-800
+                           border border-gray-700
+                           rounded-xl
+                           px-4 py-3
+                           text-white
+                           text-lg
+                           outline-none
+                           focus:border-blue-500"
+                >
+
+            </label>
+
+
+            <!-- 音效 -->
+
+            <div
+                class="flex items-center justify-between
+                       bg-gray-800 rounded-xl
+                       p-4 mb-6">
+
+                <div>
+
+                    <div class="font-bold">
+                        🔔 完成提示音
+                    </div>
+
+                    <div class="text-sm text-gray-400">
+                        計時結束時播放提示音
+                    </div>
+
+                </div>
+
+                <button
+                    id="sound-toggle"
+                    class="w-14 h-8 rounded-full
+                           bg-gray-600
+                           relative transition">
+
+                    <span
+                        id="sound-dot"
+                        class="absolute top-1 left-1
+                               w-6 h-6
+                               bg-white rounded-full
+                               transition">
+                    </span>
+
+                </button>
+
+            </div>
+
+
+            <!-- 儲存 -->
+
+            <button
+                id="save-settings-btn"
+                class="w-full
+                       bg-white text-gray-900
+                       py-4
+                       rounded-2xl
+                       font-black text-lg
+                       active:scale-95
+                       transition">
+                儲存設定
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+    // ==================================================
+    // 🍅 預設設定
+    // ==================================================
+
+    const DEFAULT_SETTINGS = {
+        work: 25,
+        short: 5,
+        long: 15,
+        sound: true
+    };
+
+    // ==================================================
+    // 💾 讀取設定
+    // ==================================================
+
+    let savedSettings;
+    try {
+        savedSettings = JSON.parse(localStorage.getItem("pomoSettings"));
+    } catch {
+        savedSettings = null;
+    }
+
+    const settings = {
+        ...DEFAULT_SETTINGS,
+        ...(savedSettings || {})
+    };
+
+    // ==================================================
+    // ⏱️ 時間
+    // ==================================================
+
+    function getDurations() {
+        return {
+            POMODORO: settings.work * 60,
+            SHORT_BREAK: settings.short * 60,
+            LONG_BREAK: settings.long * 60
+        };
+    }
+
+    // ==================================================
+    // 🎨 模式
+    // ==================================================
+
+    const MODE_CONFIG = {
+        POMODORO: {
+            color: "#EF4444",
+            name: "工作",
+            status: "專注工作中 🍅"
+        },
+        SHORT_BREAK: {
+            color: "#10B981",
+            name: "短休息",
+            status: "短暫休息一下 ☕"
+        },
+        LONG_BREAK: {
+            color: "#3B82F6",
+            name: "長時間休息",
+            status: "享受長時間休息 🌙"
+        }
+    };
+
+    // ==================================================
+    // 📊 狀態
+    // ==================================================
+
+    let currentMode = "POMODORO";
+    let durations = getDurations();
+    let timeLeft = durations.POMODORO;
+    let isRunning = false;
+    let timerInterval = null;
+    let notificationTimeout = null;
+    let autoSwitchTimeout = null;
+
+    // ==================================================
+    // 📈 統計
+    // ==================================================
+
+    let todayCount = Number(localStorage.getItem("pomoTodayCount")) || 0;
+    let streak = Number(localStorage.getItem("pomoStreak")) || 0;
+    let lastDate = localStorage.getItem("pomoLastDate") || "";
+    const today = new Date().toISOString().split("T")[0];
+
+    if (lastDate !== today) {
+        todayCount = 0;
+        localStorage.setItem("pomoTodayCount", "0");
+    }
+
+    // ==================================================
+    // 🎯 DOM
+    // ==================================================
+
+    const timeDisplay = document.getElementById("time-display");
+    const statusText = document.getElementById("status-text");
+    const startPauseBtn = document.getElementById("start-pause-btn");
+    const resetBtn = document.getElementById("reset-btn");
+    const modeButtons = document.querySelectorAll(".mode-btn");
+    const progressCircle = document.getElementById("progress-circle");
+    const timerContainer = document.getElementById("timer-container");
+    const todayCountDisplay = document.getElementById("today-count");
+    const streakDisplay = document.getElementById("streak-count");
+    const notificationBox = document.getElementById("notification-box");
+    const settingsModal = document.getElementById("settings-modal");
+    const settingsPanel = document.getElementById("settings-panel");
+    const settingsBtn = document.getElementById("settings-btn");
+    const closeSettingsBtn = document.getElementById("close-settings-btn");
+    const saveSettingsBtn = document.getElementById("save-settings-btn");
+    const soundToggle = document.getElementById("sound-toggle");
+    const soundDot = document.getElementById("sound-dot");
+    const workInput = document.getElementById("work-input");
+    const shortInput = document.getElementById("short-input");
+    const longInput = document.getElementById("long-input");
+    const clearCountBtn = document.getElementById("clear-count-btn");
+
+    // ==================================================
+    // 🔵 進度圈初始化修正
+    // ==================================================
+
+    const CIRCLE_RADIUS = 108;
+    const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
+
+    progressCircle.style.strokeDasharray = `${CIRCLE_CIRCUMFERENCE} ${CIRCLE_CIRCUMFERENCE}`;
+    progressCircle.style.strokeDashoffset = 0;
+
+    // ==================================================
+    // 🔔 音效
+    // ==================================================
+
+    let synth = null;
+
+    function initSound() {
+        if (!synth && typeof Tone !== "undefined") {
+            synth = new Tone.Synth().toDestination();
+        }
+    }
+
+    async function playSound() {
+        if (!settings.sound) return;
+        try {
+            initSound();
+            if (typeof Tone !== "undefined" && Tone.context.state !== "running") {
+                await Tone.start();
+            }
+            if (synth) {
+                synth.triggerAttackRelease("C5", "8n");
+                setTimeout(() => {
+                    synth.triggerAttackRelease("E5", "8n");
+                }, 180);
+            }
+        } catch (error) {
+            console.log("無法播放提示音");
+        }
+    }
+
+    // ==================================================
+    // ⏱️ 格式化
+    // ==================================================
+
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return (
+            String(minutes).padStart(2, "0") +
+            ":" +
+            String(secs).padStart(2, "0")
+        );
+    }
+
+    // ==================================================
+    // 🎨 更新畫面
+    // ==================================================
+
+    function updateUI() {
+        durations = getDurations();
+        const config = MODE_CONFIG[currentMode];
+        const total = durations[currentMode];
+
+        // 時間
+        timeDisplay.textContent = formatTime(timeLeft);
+
+        // 網頁標題
+        if (isRunning) {
+            document.title = `${formatTime(timeLeft)} · 🍅 蕃茄鐘`;
+        } else {
+            document.title = "🍅 蕃茄鐘";
+        }
+
+        // 狀態
+        statusText.textContent = config.status;
+
+        // 進度圈計算修正：隨著時間減少，讓圓圈邊框順暢收縮
+        const progress = timeLeft / total;
+        const offset = CIRCLE_CIRCUMFERENCE * (1 - progress);
+        progressCircle.style.strokeDashoffset = offset;
+
+        // 顏色
+        progressCircle.style.stroke = config.color;
+        document.body.style.backgroundColor = config.color;
+
+        // 模式按鈕
+        modeButtons.forEach(button => {
+            const selected = button.dataset.mode === currentMode;
+            if (selected) {
+                button.style.backgroundColor = config.color;
+                button.style.color = "#FFFFFF";
+            } else {
+                button.style.backgroundColor = "transparent";
+                button.style.color = "rgba(255,255,255,0.7)";
+            }
+        });
+
+        // 按鈕
+        if (isRunning) {
+            startPauseBtn.textContent = "暫停";
+            timerContainer.classList.add("running");
+        } else {
+            timerContainer.classList.remove("running");
+            if (timeLeft === total) {
+                startPauseBtn.textContent = "開始";
+            } else {
+                startPauseBtn.textContent = "繼續";
+            }
+        }
+
+        // 統計
+        todayCountDisplay.textContent = todayCount;
+        streakDisplay.textContent = streak;
+    }
+
+    // ==================================================
+    // 🔄 切換模式
+    // ==================================================
+
+    function setMode(mode) {
+        clearInterval(timerInterval);
+        clearTimeout(autoSwitchTimeout);
+        timerInterval = null;
+        currentMode = mode;
+        durations = getDurations();
+        timeLeft = durations[mode];
+        isRunning = false;
+        updateUI();
+    }
+
+    // ==================================================
+    // ▶️ 開始／暫停
+    // ==================================================
+
+    async function toggleTimer() {
+        initSound();
+        if (typeof Tone !== "undefined" && Tone.context.state !== "running") {
+            try {
+                await Tone.start();
+            } catch {}
+        }
+
+        if (isRunning) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            isRunning = false;
+        } else {
+            isRunning = true;
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateUI();
+                if (timeLeft <= 0) {
+                    handleTimerEnd();
+                }
+            }, 1000);
+        }
+        updateUI();
+    }
+
+    // ==================================================
+    // 🎉 完成
+    // ==================================================
+
+    function handleTimerEnd() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        isRunning = false;
+        playSound();
+
+        let nextMode;
+        let message;
+
+        if (currentMode === "POMODORO") {
+            todayCount++;
+            localStorage.setItem("pomoTodayCount", todayCount);
+
+            const currentDate = new Date().toISOString().split("T")[0];
+            if (lastDate !== currentDate) {
+                streak++;
+                lastDate = currentDate;
+                localStorage.setItem("pomoStreak", streak);
+                localStorage.setItem("pomoLastDate", currentDate);
+            }
+
+            if (todayCount % 4 === 0) {
+                nextMode = "LONG_BREAK";
+                message = "🎉 太棒了！完成 4 個蕃茄鐘，現在享受長休息吧！";
+            } else {
+                nextMode = "SHORT_BREAK";
+                message = "🍅 蕃茄鐘完成！休息一下吧！";
+            }
+        } else {
+            nextMode = "POMODORO";
+            message = "⏰ 休息結束！準備開始下一個蕃茄鐘！";
+        }
+
+        updateUI();
+        showNotification(message);
+
+        autoSwitchTimeout = setTimeout(() => {
+            setMode(nextMode);
+        }, 3000);
+    }
+
+    // ==================================================
+    // 🔔 通知
+    // ==================================================
+
+    function showNotification(message) {
+        clearTimeout(notificationTimeout);
+        notificationBox.textContent = message;
+        notificationBox.classList.remove("opacity-0", "translate-y-5");
+        notificationBox.classList.add("opacity-100", "translate-y-0");
+
+        notificationTimeout = setTimeout(() => {
+            notificationBox.classList.remove("opacity-100", "translate-y-0");
+            notificationBox.classList.add("opacity-0", "translate-y-5");
+        }, 3000);
+    }
+
+    // ==================================================
+    // 🔄 重設
+    // ==================================================
+
+    resetBtn.addEventListener("click", () => {
+        setMode(currentMode);
+        showNotification(`🔄 ${MODE_CONFIG[currentMode].name}模式已重設`);
+    });
+
+    // ==================================================
+    // 🍅 模式按鈕
+    // ==================================================
+
+    modeButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            const mode = button.dataset.mode;
+            setMode(mode);
+            showNotification(`已切換到 ${MODE_CONFIG[mode].name}模式`);
+        });
+    });
+
+    // ==================================================
+    // ⚙️ 開啟／關閉設定
+    // ==================================================
+
+    function openSettings() {
+        durations = getDurations();
+        workInput.value = settings.work;
+        shortInput.value = settings.short;
+        longInput.value = settings.long;
+        updateSoundButton();
+
+        settingsModal.classList.remove("opacity-0", "pointer-events-none");
+        settingsPanel.classList.remove("scale-95");
+        settingsPanel.classList.add("scale-100");
+    }
+
+    function closeSettings() {
+        settingsModal.classList.add("opacity-0", "pointer-events-none");
+        settingsPanel.classList.remove("scale-100");
+        settingsPanel.classList.add("scale-95");
+    }
+
+    settingsBtn.addEventListener("click", openSettings);
+    closeSettingsBtn.addEventListener("click", closeSettings);
+
+    settingsModal.addEventListener("click", event => {
+        if (event.target === settingsModal) {
+            closeSettings();
+        }
+    });
+
+    // ==================================================
+    // 🔊 音效切換
+    // ==================================================
+
+    function updateSoundButton() {
+        if (settings.sound) {
+            soundToggle.style.backgroundColor = "#10B981";
+            soundDot.style.transform = "translateX(24px)";
+        } else {
+            soundToggle.style.backgroundColor = "#4B5563";
+            soundDot.style.transform = "translateX(0)";
+        }
+    }
+
+    soundToggle.addEventListener("click", () => {
+        settings.sound = !settings.sound;
+        updateSoundButton();
+    });
+
+    // ==================================================
+    // 💾 儲存設定
+    // ==================================================
+
+    saveSettingsBtn.addEventListener("click", () => {
+        let work = parseInt(workInput.value);
+        let short = parseInt(shortInput.value);
+        let long = parseInt(longInput.value);
+
+        if (!Number.isFinite(work) || work < 1 || work > 120) {
+            showNotification("⚠️ 工作時間必須是 1～120 分鐘");
+            return;
+        }
+        if (!Number.isFinite(short) || short < 1 || short > 60) {
+            showNotification("⚠️ 短休息必須是 1～60 分鐘");
+            return;
+        }
+        if (!Number.isFinite(long) || long < 1 || long > 120) {
+            showNotification("⚠️ 長休息必須是 1～120 分鐘");
+            return;
+        }
+
+        settings.work = work;
+        settings.short = short;
+        settings.long = long;
+
+        localStorage.setItem("pomoSettings", JSON.stringify(settings));
+        setMode(currentMode);
+        closeSettings();
+        showNotification("✅ 設定已儲存！");
+    });
+
+    // ==================================================
+    // 🗑️ 清除今日紀錄
+    // ==================================================
+
+    clearCountBtn.addEventListener("click", () => {
+        todayCount = 0;
+        localStorage.setItem("pomoTodayCount", "0");
+        updateUI();
+        showNotification("🗑️ 今日蕃茄鐘紀錄已清除");
+    });
+
+    // ==================================================
+    // ⌨️ 鍵盤快捷鍵
+    // ==================================================
+
+    document.addEventListener("keydown", event => {
+        if (event.code === "Space" && event.target.tagName !== "INPUT") {
+            event.preventDefault();
+            toggleTimer();
+        }
+        if (event.key.toLowerCase() === "r" && event.target.tagName !== "INPUT") {
+            setMode(currentMode);
+        }
+    });
+
+    // ==================================================
+    // 🚀 啟動
+    // ==================================================
+
+    startPauseBtn.addEventListener("click", toggleTimer);
+    updateSoundButton();
+    updateUI();
+
+</script>
+
+</body>
+</html>
